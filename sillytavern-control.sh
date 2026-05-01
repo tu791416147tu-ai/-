@@ -55,8 +55,8 @@ install_deps() {
     info "更新软件源..."
     pkg update -y
 
-    info "安装 Node.js 和 Git..."
-    pkg install -y nodejs git
+    info "安装 Node.js、Git 和日志工具..."
+    pkg install -y nodejs git expect
 
     pick_npm_mirror
 }
@@ -350,7 +350,7 @@ start_tavern() {
     info "正在启动 SillyTavern..."
 
     # ✅ 修复5：添加 disown，防止关闭 Termux 会话后进程被杀
-    nohup node server.js > "$LOG" 2>&1 &
+    nohup unbuffer node server.js > "$LOG" 2>&1 &
     echo $! > "$PID_FILE"
     disown
 
@@ -412,28 +412,40 @@ status_tavern() {
 #  查看日志
 # ==============================================
 view_log() {
-    if [ ! -f "$LOG" ]; then
-        err "日志文件不存在"
-        sleep 1
-        return
+    local st_log_dir="$TAVERN/logs"
+    local st_log=""
+
+    if [ -d "$st_log_dir" ]; then
+        st_log=$(ls -t "$st_log_dir"/*.log 2>/dev/null | head -1)
     fi
 
     clear
     echo "日志查看方式:"
-    echo " 1. 实时滚动"
-    echo " 2. 最后50行"
+    echo " 1. 启动日志（实时）"
+    if [ -n "$st_log" ]; then
+        echo " 2. 运行日志（实时）"
+    fi
     echo " 0. 返回"
     read -p "选择: " c
+
     case $c in
         1)
-           echo "（按 Ctrl+C 返回菜单）"
-           trap 'echo ""; return' INT
-           tail -f "$LOG"
-           trap - INT
-           ;;
-        2) tail -n 50 "$LOG" ; echo "" ; read -p "按回车继续..." ;;
+            if [ ! -f "$LOG" ]; then err "启动日志不存在"; sleep 1; return; fi
+            echo "（按 Ctrl+C 返回菜单）"
+            trap 'echo ""; return' INT
+            tail -f "$LOG"
+            trap - INT
+            ;;
+        2)
+            if [ -z "$st_log" ]; then err "运行日志不存在"; sleep 1; return; fi
+            echo "日志文件: $st_log"
+            echo "（按 Ctrl+C 返回菜单）"
+            trap 'echo ""; return' INT
+            tail -f "$st_log"
+            trap - INT
+            ;;
         0) return ;;
-        *) err "无效" ; sleep 1 ;;
+        *) err "无效"; sleep 1 ;;
     esac
 }
 

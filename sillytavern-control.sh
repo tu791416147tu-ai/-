@@ -193,8 +193,75 @@ update_tavern() {
 }
 
 # ==============================================
-#  安装/重装 SillyTavern
+#  开机自启（Termux 会话启动时自动运行）
 # ==============================================
+AUTOSTART_MARK="# ST_AUTOSTART"
+BASHRC="$TERMUX_HOME/.bash_profile"
+SCRIPT_PATH="$TERMUX_HOME/sillytavern-control.sh"
+
+autostart_enabled() {
+    grep -q "$AUTOSTART_MARK" "$BASHRC" 2>/dev/null
+}
+
+enable_autostart() {
+    if autostart_enabled; then
+        return
+    fi
+    cat >> "$BASHRC" <<EOF
+
+$AUTOSTART_MARK
+bash "$SCRIPT_PATH"
+EOF
+    ok "自启已开启 ✅"
+    info "下次打开 Termux 将自动启动酒馆"
+}
+
+disable_autostart() {
+    if ! autostart_enabled; then
+        warn "自启未开启"
+        return
+    fi
+    # 删除标记行及紧随的 bash 启动行
+    sed -i "/$AUTOSTART_MARK/{N;d;}" "$BASHRC"
+    # 清理可能残留的空行
+    sed -i '/^$/N;/^\n$/d' "$BASHRC"
+    ok "自启已关闭 ❌"
+}
+
+toggle_autostart() {
+    clear
+    echo "======================================"
+    echo "     开机自启设置"
+    echo "======================================"
+    if autostart_enabled; then
+        echo -e " 当前状态: ${GREEN}已开启${NC}"
+        echo ""
+        echo " 1. 关闭自启"
+        echo " 0. 返回"
+        read -p "选择: " c
+        case $c in
+            1) disable_autostart ;;
+            0) return ;;
+            *) err "无效"; sleep 1 ;;
+        esac
+    else
+        echo -e " 当前状态: ${RED}未开启${NC}"
+        echo ""
+        echo " 开启后，每次打开 Termux 会自动启动酒馆"
+        echo " 脚本路径: $SCRIPT_PATH"
+        echo ""
+        echo " 1. 开启自启"
+        echo " 0. 返回"
+        read -p "选择: " c
+        case $c in
+            1) enable_autostart ;;
+            0) return ;;
+            *) err "无效"; sleep 1 ;;
+        esac
+    fi
+}
+
+
 install_tavern() {
     clear
     echo "======================================"
@@ -374,6 +441,9 @@ view_log() {
 #  主菜单
 # ==============================================
 menu() {
+    # 每次运行脚本自动注册自启
+    enable_autostart
+
     while true; do
         clear
         echo "======================================"
@@ -420,4 +490,3 @@ case "$1" in
     status)  status_tavern ;;
     *)       menu ;;
 esac
-
